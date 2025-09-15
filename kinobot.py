@@ -1,5 +1,9 @@
 import json
 import logging
+import os
+
+TOKEN = os.getenv("TOKEN")
+
 from datetime import datetime, timedelta
 from pathlib import Path
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -8,22 +12,21 @@ from telegram.ext import (
     CallbackQueryHandler, ContextTypes, filters
 )
 
-# ===== CONFIG =====
-TOKEN = "8281932561:AAHpRfJKJHTCnlG0Ap5oFABMU9BFUCmllW0"
+
 OWNER_ID = 8148661928
 ADMINS_FILE = Path("admins.json")
 MOVIES_FILE = Path("movies.json")
 CHANNELS_FILE = Path("channels.json")
-REQUIRED_CHANNELS = ["@edit_11k"]  # Majburiy kanallar
+REQUIRED_CHANNELS = ["@edit_11k"]
 
-# ===== LOGGING =====
+
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# ===== JSON YUKLASH/SAVE =====
+
 def load_json(file: Path, default: dict):
     if not file.exists():
         file.write_text(json.dumps(default, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -32,7 +35,6 @@ def load_json(file: Path, default: dict):
 def save_json(file: Path, data: dict):
     file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
-# ===== ADMIN VA MOVIE FUNCTIONS =====
 def load_admins():
     return load_json(ADMINS_FILE, {"admins": []})
 
@@ -51,16 +53,16 @@ def load_channels():
 def save_channels(data):
     save_json(CHANNELS_FILE, data)
 
-# ===== CHECK IF ADMIN =====
+
 def is_admin(user_id: int) -> bool:
     admins = load_admins()
     return user_id == OWNER_ID or user_id in admins["admins"]
 
-# ===== CHANNEL SUBSCRIPTION CHECK =====
-REQUIRED_CHANNELS = ["@movieuzfilm"]  # Majburiy kanal
+
+REQUIRED_CHANNELS = ["@movieuzfilm"]
 
 def sub_buttons():
-    # Majburiy + qo‘shilgan kanallarni birlashtiramiz
+
     channels = REQUIRED_CHANNELS + load_channels()
     buttons = [
         [InlineKeyboardButton("KANALGA QO‘SHILISH +", url=f"https://t.me/{ch.lstrip('@')}")]
@@ -72,7 +74,7 @@ def sub_buttons():
 
 async def is_subscribed(bot, user_id: int):
     not_sub = []
-    channels = REQUIRED_CHANNELS + load_channels()  # Majburiy + qo‘shilgan
+    channels = REQUIRED_CHANNELS + load_channels()  
     for ch in channels:
         try:
             member = await bot.get_chat_member(ch, user_id)
@@ -129,7 +131,6 @@ async def check_subscription_cb(update: Update, context: ContextTypes.DEFAULT_TY
     else:
         await query.edit_message_text("❌ Obuna bo‘lmadingiz!", reply_markup=sub_buttons())
 
-# ===== ADD MOVIE CONVERSATION =====
 WAIT_VIDEO, WAIT_CODE, WAIT_TITLE, WAIT_YEAR, WAIT_GENRE = range(5)
 
 async def add_movie_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -183,7 +184,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❌ Bekor qilindi.")
     return ConversationHandler.END
 
-# ===== HANDLE MOVIE CODE =====
+
 async def handle_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     code = update.message.text.strip()
     data = load_movies()
@@ -198,7 +199,6 @@ async def handle_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_video(m["file_id"], caption=text)
 
-# ===== ADMIN COMMANDS =====
 async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID:
         return await update.message.reply_text("❌ Siz admin qo‘shish huquqiga ega emassiz.")
@@ -231,12 +231,11 @@ async def del_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_admins(admins)
     await update.message.reply_text(f"🗑 Admin o‘chirildi: {remove_id}")
 
-# ===== TRACK USERS =====
+
 async def track_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.bot_data.setdefault("users", {})
     context.bot_data["users"][update.effective_user.id] = str(datetime.now().date())
 
-# ===== DELETE MOVIE =====
 async def delmovie(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return await update.message.reply_text("❌ Sizda kino o‘chirish huquqi yo‘q.")
@@ -251,7 +250,6 @@ async def delmovie(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❌ Topilmadi.")
 
-# ===== STATISTICS =====
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return await update.message.reply_text("❌ Siz admin emassiz.")
@@ -288,7 +286,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text += f"👑 OWNER: {OWNER_ID}"
     await update.message.reply_text(text, parse_mode="Markdown")
 
-# ===== BROADCAST =====
+
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return await update.message.reply_text("❌ Siz admin emassiz.")
@@ -330,7 +328,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("❌ Faqat matn, foto, video, hujjat yoki audio yuborishingiz mumkin.")
     await update.message.reply_text(f"✅ Yuborildi: {success}\n❌ Yuborilmadi: {failed}")
 
-# ===== CHANNEL MANAGEMENT =====
+
 async def add_channel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return await update.message.reply_text("❌ Siz admin emassiz!")
@@ -357,7 +355,6 @@ async def del_channel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_channels(channels)
     await update.message.reply_text(f"🗑 {channel} kanal o‘chirildi!")
 
-# ===== MAIN FUNCTION =====
 def main():
     app = Application.builder().token(TOKEN).build()
 
@@ -384,8 +381,8 @@ def main():
     app.add_handler(CommandHandler("delmovie", delmovie))
     app.add_handler(CommandHandler("addchanel", add_channel))
     app.add_handler(CommandHandler("delchanel", del_channel))
-    app.add_handler(MessageHandler(filters.ALL, track_users), group=1)
     app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(MessageHandler(filters.ALL, track_users), group=1)
 
 
     print("🤖 Bot ishga tushdi...")
